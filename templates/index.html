@@ -1,0 +1,774 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>IFC Funding Estimator</title>
+  <style>
+    :root{
+      --gap: 12px;
+      --pad: 10px;
+      --radius: 10px;
+      --border: #ddd;
+      --muted: #666;
+    }
+
+    * { box-sizing: border-box; }
+
+    body { font-family: Arial, sans-serif; max-width: 1100px; margin: 28px auto; padding: 0 12px; }
+    .card { border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin: 14px 0; }
+    label { font-weight: 600; display:block; margin-bottom: 6px; }
+
+    input, select {
+      width: 100%;
+      height: 40px;
+      padding: 0 var(--pad);
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      font-size: 14px;
+      line-height: 40px;
+    }
+    input[disabled] { background:#f3f4f6; color:#374151; }
+
+    button { padding: 10px 14px; border: 0; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    .primary { background: #2563eb; color: white; }
+    .secondary { background: #e5e7eb; }
+    .danger { background: #ef4444; color: white; }
+    .warning { background: #f59e0b; color: white; }
+
+    table { width:100%; border-collapse: collapse; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align:left; font-size: 14px; vertical-align: top; }
+    .muted { color: var(--muted); font-size: 14px; }
+    .actions { margin-top: 12px; display:flex; gap:10px; flex-wrap: wrap; align-items: center; }
+    .mono { font-family: ui-monospace, monospace; }
+    .pill { display:inline-block; padding: 3px 8px; border-radius: 999px; font-size: 12px; border: 1px solid #ddd; }
+    .pill.ok { background:#ecfdf5; border-color:#10b98133; }
+    .pill.bad { background:#fff7ed; border-color:#f59e0b33; }
+    .small { font-size: 12px; }
+
+    input::placeholder { color: #9ca3af; opacity: 1; }
+
+    .grid-2, .grid-3 {
+      display: grid;
+      gap: var(--gap);
+      align-items: start;
+    }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+    @media (max-width: 860px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    .ghost-label {
+      display: block;
+      margin-bottom: 6px;
+      font-weight: 600;
+      visibility: hidden;
+    }
+    .btn-row button {
+      height: 40px;
+      padding: 0;
+      line-height: 40px;
+    }
+
+    .ac-wrap { position: relative; }
+    .ac-list {
+      position: absolute;
+      left: 0; right: 0;
+      top: calc(100% + 6px);
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      background: white;
+      max-height: 240px;
+      overflow-y: auto;
+      box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+      display: none;
+      z-index: 50;
+    }
+    .ac-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #f3f4f6; }
+    .ac-item:hover { background:#f9fafb; }
+    .ac-item:last-child { border-bottom: 0; }
+    .ac-item .hint { color:#6b7280; font-size: 12px; margin-top: 3px; }
+  </style>
+</head>
+<body>
+
+{% macro money2(v) -%}
+  {%- set x = (v|default(0, true)) -%}
+  {%- if x is string and (x|trim) == "" -%}
+    $0.00
+  {%- else -%}
+    ${{ "{:,.2f}".format(x|float) }}
+  {%- endif -%}
+{%- endmacro %}
+
+{% set climate_default = climate_default|default("No") %}
+{% set gender_default = gender_default|default("No") %}
+
+<h2>IFC Funding Estimator</h2>
+<p class="muted">Budgets are entered once. Remaining updates automatically as you log/edit investments.</p>
+
+{% if msg is defined and msg and (msg|trim) != "" %}
+  <div class="card" style="border-color:#c7d2fe; background:#eef2ff;">
+    <b>{{ msg }}</b>
+  </div>
+{% endif %}
+
+<div class="card">
+  <h3>Step 1: Enter regional budgets</h3>
+  <form method="POST" action="/set_budgets" autocomplete="off">
+
+    <div class="grid-3">
+      <div>
+        <label>Region 1 budget (USD)</label>
+        <input name="budget_1" value="{{ budgets['1']|default(0,true) }}" placeholder="e.g. 3000000">
+      </div>
+      <div>
+        <label>Region 2 budget (USD)</label>
+        <input name="budget_2" value="{{ budgets['2']|default(0,true) }}" placeholder="e.g. 3000000">
+      </div>
+      <div>
+        <label>Region 3 budget (USD)</label>
+        <input name="budget_3" value="{{ budgets['3']|default(0,true) }}" placeholder="e.g. 3000000">
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-top:12px;">
+      <div>
+        <label>Region 4 budget (USD)</label>
+        <input name="budget_4" value="{{ budgets['4']|default(0,true) }}" placeholder="e.g. 3000000">
+      </div>
+      <div>
+        <label>Region 5 budget (USD)</label>
+        <input name="budget_5" value="{{ budgets['5']|default(0,true) }}" placeholder="e.g. 3000000">
+      </div>
+
+      <div class="btn-row">
+        <span class="ghost-label">Spacer</span>
+        <button class="primary" type="submit" style="width:100%;">Set / Update Budgets</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px; background:#fafafa;">
+      <b>Current remaining by region</b>
+      <div class="grid-3" style="margin-top:10px;">
+        <div><span class="pill">R1</span> <span class="mono" id="rem_1">{{ money2(remaining_by_region['1']) }}</span></div>
+        <div><span class="pill">R2</span> <span class="mono" id="rem_2">{{ money2(remaining_by_region['2']) }}</span></div>
+        <div><span class="pill">R3</span> <span class="mono" id="rem_3">{{ money2(remaining_by_region['3']) }}</span></div>
+      </div>
+      <div class="grid-3" style="margin-top:8px;">
+        <div><span class="pill">R4</span> <span class="mono" id="rem_4">{{ money2(remaining_by_region['4']) }}</span></div>
+        <div><span class="pill">R5</span> <span class="mono" id="rem_5">{{ money2(remaining_by_region['5']) }}</span></div>
+        <div class="muted small">Remaining is budget minus total invested logged for that region.</div>
+      </div>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h3>Step 2: Add a project and estimate</h3>
+
+  <form method="POST" action="/estimate" autocomplete="off">
+    <div class="grid-2">
+      <div>
+        <label>Region</label>
+        <select name="region" id="region_input" required>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="4">4</option>
+          <option value="5">5</option>
+        </select>
+        <div class="muted">Remaining for selected region: <span class="mono" id="remaining_selected">$0.00</span></div>
+      </div>
+      <div>
+        <label>Quarter</label>
+        <select name="quarter" id="quarter_input">
+          <option>Q1</option>
+          <option>Q2</option>
+          <option>Q3</option>
+          <option>Q4</option>
+        </select>
+        <div class="muted">Example: Q1</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:12px;">
+      <div>
+        <label>Project type (Business Area)</label>
+        <div class="ac-wrap">
+          <input name="project_type" id="project_type_input" required placeholder="Type to search, e.g. MAS-Health-Health Other">
+          <div class="ac-list" id="ac_list"></div>
+        </div>
+        <div class="muted" id="ptype_status">Click the box to see suggestions, or start typing to search.</div>
+      </div>
+
+      <div>
+        <label>Remaining budget for selected region</label>
+        <input id="remaining_selected_input" disabled class="mono" value="$0.00">
+        <div class="muted">Recommendation is calculated from this amount automatically.</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:12px;">
+      <div>
+        <label>Climate (Yes/No)</label>
+        <select name="climate_yn">
+          <option {% if climate_default == "Yes" %}selected{% endif %}>Yes</option>
+          <option {% if climate_default == "No" %}selected{% endif %}>No</option>
+        </select>
+      </div>
+      <div>
+        <label>Gender (Yes/No)</label>
+        <select name="gender_yn">
+          <option {% if gender_default == "Yes" %}selected{% endif %}>Yes</option>
+          <option {% if gender_default == "No" %}selected{% endif %}>No</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="primary" type="submit">Estimate</button>
+      <a href="/download"><button class="secondary" type="button">Download CSV</button></a>
+    </div>
+  </form>
+</div>
+
+{% if result is defined and result %}
+  <div class="card">
+    <h3>Estimate Result</h3>
+
+    <p>
+      <b>Region:</b> {{ result.region }}
+      |
+      <b>Quarter:</b> {{ result.quarter }}
+    </p>
+
+    <p>
+      <b>Project Type:</b>
+      <span class="mono">{{ result.project_type }}</span>
+      {% if result.project_type_known %}
+        <span class="pill ok">Known</span>
+      {% else %}
+        <span class="pill bad">Not in database</span>
+      {% endif %}
+    </p>
+
+    {% if not result.project_type_known %}
+      <p class="muted">
+        This project type was not found in the training data list. The model can still produce a prediction using text features,
+        but accuracy may be lower. Double-check spelling.
+      </p>
+    {% endif %}
+
+    <p>
+      <b>Climate:</b> {{ result.climate }}
+      |
+      <b>Gender:</b> {{ result.gender }}
+    </p>
+
+    <p><b>Remaining funding (before):</b> {{ money2(result.remaining_before) }}</p>
+
+    <p>
+      <b>Predicted quarter ratio:</b>
+      <span class="mono">{{ "{:.6f}".format(result.pred_quarter_ratio|float) }}</span>
+    </p>
+
+    <p><b>Recommended investment:</b> {{ money2(result.recommended) }}</p>
+
+    <p><b>Remaining funding (after):</b> {{ money2(result.remaining_after) }}</p>
+
+    <hr>
+
+    <form method="POST" action="/confirm">
+      <input type="hidden" name="region" value="{{ result.region }}">
+      <input type="hidden" name="quarter" value="{{ result.quarter }}">
+      <input type="hidden" name="project_type" value="{{ result.project_type }}">
+      <input type="hidden" name="climate" value="{{ result.climate }}">
+      <input type="hidden" name="gender" value="{{ result.gender }}">
+
+      <div class="grid-2">
+        <div>
+          <label>Confirm investment amount (edit if custom)</label>
+          <input name="invested" value="{{ "{:.2f}".format(result.recommended|float) }}">
+          <div class="muted">Amounts are stored to 2 decimal places.</div>
+        </div>
+
+        <div class="btn-row">
+          <span class="ghost-label">Spacer</span>
+          <button class="primary" type="submit" style="width:100%;">Confirm & Log</button>
+        </div>
+      </div>
+    </form>
+  </div>
+{% endif %}
+
+<div class="card">
+  <h3>Step 3: Logged projects (edit invested without re-entering)</h3>
+
+  {% if log is defined and log and log|length > 0 %}
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>Quarter</th>
+          <th>Project Type</th>
+          <th>Climate</th>
+          <th>Gender</th>
+          <th>Invested</th>
+          <th>Remaining After</th>
+          <th>Edit / Delete</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in log %}
+          <tr>
+            <td>{{ row.get("Region", "") }}</td>
+            <td>{{ row.get("Quarter", "") }}</td>
+            <td class="mono">{{ row.get("Project Type", "") }}</td>
+            <td>{{ row.get("Climate", "") }}</td>
+            <td>{{ row.get("Gender", "") }}</td>
+            <td>{{ money2(row.get("Invested", 0)) }}</td>
+            <td>{{ money2(row.get("Remaining After", 0)) }}</td>
+            <td>
+              <form method="POST" action="/update_entry"
+                    style="display:flex; gap:8px; align-items:center; margin-bottom:8px; flex-wrap:nowrap;">
+                <input type="hidden" name="id" value="{{ row.get('id','') }}">
+                <input name="invested"
+                       value="{{ "{:.2f}".format(row.get('Invested',0)|float) }}"
+                       style="width:140px; flex:0 0 140px;">
+                <button class="secondary" type="submit" style="flex:0 0 auto;">Update</button>
+              </form>
+              <form method="POST" action="/delete_entry" onsubmit="return confirm('Delete this entry?');">
+                <input type="hidden" name="id" value="{{ row.get('id','') }}">
+                <button class="danger" type="submit" style="width:100%;">Delete</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">No projects logged yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3>Optional: Distribute remaining funding across logged projects</h3>
+  <p class="muted">This adds additional investment to existing logged projects in proportion to their current invested amounts.</p>
+
+  <form method="POST" action="/distribute_preview" autocomplete="off">
+    <div class="grid-2">
+      <div>
+        <label>Quarter to distribute within</label>
+        <select name="dist_quarter">
+          <option>Q1</option>
+          <option>Q2</option>
+          <option>Q3</option>
+          <option>Q4</option>
+        </select>
+        <div class="muted">Only projects logged in this quarter are eligible.</div>
+      </div>
+      <div>
+        <label>Region</label>
+        <select name="dist_region">
+          <option>All</option>
+          <option>1</option>
+          <option>2</option>
+          <option>3</option>
+          <option>4</option>
+          <option>5</option>
+        </select>
+        <div class="muted">All = distributes within each region separately.</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-top:12px;">
+      <div>
+        <label>Amount</label>
+        <select name="dist_amount_mode" id="dist_amount_mode">
+          <option value="remaining">Use remaining budget (recommended)</option>
+          <option value="custom">Use custom amount (clamped to remaining)</option>
+        </select>
+      </div>
+      <div>
+        <label>Custom amount (USD)</label>
+        <input name="dist_custom_amount" id="dist_custom_amount" placeholder="Enabled only if custom selected" disabled>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="warning" type="submit">Preview Distribution</button>
+    </div>
+  </form>
+
+  {% if dist_preview is defined and dist_preview %}
+    <hr>
+    <h4>Distribution preview (confirm to apply)</h4>
+    <p>
+      <b>Quarter:</b> {{ dist_preview.quarter }}
+      |
+      <b>Region:</b> {{ dist_preview.region_sel }}
+      |
+      <b>Total distributed:</b> {{ money2(dist_preview.amount_to_dist) }}
+    </p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Region</th>
+          <th>Quarter</th>
+          <th>Project Type</th>
+          <th>Current</th>
+          <th>+ Add</th>
+          <th>New Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in dist_preview.rows %}
+          <tr>
+            <td>{{ r.Region }}</td>
+            <td>{{ r.Quarter }}</td>
+            <td class="mono">{{ r["Project Type"] }}</td>
+            <td>{{ money2(r.Invested_Current) }}</td>
+            <td>{{ money2(r.Invested_Add) }}</td>
+            <td><b>{{ money2(r.Invested_New) }}</b></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <form method="POST" action="/distribute_confirm" onsubmit="return confirm('Apply this distribution? This will update invested values in the log.');">
+      <input type="hidden" name="dist_quarter" value="{{ dist_preview.quarter }}">
+      <input type="hidden" name="dist_region" value="{{ dist_preview.region_sel }}">
+      <input type="hidden" name="dist_amount_mode" value="{{ dist_preview.amount_mode }}">
+      <input type="hidden" name="dist_custom_amount" value="{{ dist_preview.custom_amount }}">
+      <div class="actions">
+        <button class="primary" type="submit">Confirm & Apply distribution</button>
+      </div>
+    </form>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="actions">
+    <form method="POST" action="/clear" onsubmit="return confirm('Clear the investment log?');">
+      <button class="danger" type="submit">Clear Log</button>
+    </form>
+
+    <form method="POST" action="/clear_all" onsubmit="return confirm('Clear BOTH the investment log and budgets?');">
+      <button class="danger" type="submit">Clear Log and Budget Data</button>
+    </form>
+
+    <button class="secondary" type="button" onclick="closeApp()">Close App</button>
+  </div>
+</div>
+
+<script id="remaining_by_region_json" type="application/json">
+{{ remaining_by_region|tojson }}
+</script>
+
+<script>
+  async function closeApp() {
+    if (!confirm("Close the app now?")) return;
+
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon("/quit", new Blob([], { type: "text/plain" }));
+      } else {
+        await fetch("/quit", { method: "POST", keepalive: true });
+      }
+    } catch (e) {}
+
+    try {
+      window.open("", "_self");
+      window.close();
+    } catch (e) {}
+
+    document.body.innerHTML =
+      "<div style='font-family:Arial; padding:24px;'>" +
+      "<h3>App closed.</h3>" +
+      "<p>You can close this tab now.</p>" +
+      "</div>";
+  }
+
+  let remainingByRegion = {};
+  try {
+    const el = document.getElementById("remaining_by_region_json");
+    remainingByRegion = JSON.parse((el && el.textContent) ? el.textContent : "{}");
+  } catch (e) {
+    remainingByRegion = {};
+  }
+
+  const regionInput = document.getElementById("region_input");
+  const remainingSelected = document.getElementById("remaining_selected");
+  const remainingSelectedInput = document.getElementById("remaining_selected_input");
+
+  function fmtMoney2(x) {
+    const n = Number(x || 0);
+    return n.toLocaleString(undefined, {style:"currency", currency:"USD", minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+
+  function updateRemainingSelected() {
+    const r = parseInt((regionInput && regionInput.value) ? regionInput.value : "1", 10);
+    const val = Number(remainingByRegion[String(r)] || 0);
+    const txt = fmtMoney2(Math.max(0, val));
+    if (remainingSelected) remainingSelected.textContent = txt;
+    if (remainingSelectedInput) remainingSelectedInput.value = txt;
+  }
+
+  if (regionInput) {
+    regionInput.addEventListener("change", updateRemainingSelected);
+    updateRemainingSelected();
+  }
+
+  const distMode = document.getElementById("dist_amount_mode");
+  const distCustom = document.getElementById("dist_custom_amount");
+  if (distMode && distCustom) {
+    function toggleCustom() {
+      const isCustom = distMode.value === "custom";
+      distCustom.disabled = !isCustom;
+      if (!isCustom) distCustom.value = "";
+    }
+    distMode.addEventListener("change", toggleCustom);
+    toggleCustom();
+  }
+
+  const pInput = document.getElementById("project_type_input");
+  const acList = document.getElementById("ac_list");
+  const pStatus = document.getElementById("ptype_status");
+
+  let acOpen = false;
+  let lastQuerySent = "";
+  let acTimer = null;
+
+  let cachedTopPayload = null;
+  let cachedTopAt = 0;
+
+  function closeAC() {
+    if (!acList) return;
+    acList.style.display = "none";
+    acOpen = false;
+  }
+  function openAC() {
+    if (!acList) return;
+    acList.style.display = "block";
+    acOpen = true;
+  }
+
+  function escapeHtml(s) {
+    return (s || "").replace(/[&<>"']/g, function(c) {
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[c];
+    });
+  }
+
+  function normKey(s) {
+    return (s || "")
+      .toString()
+      .trim()
+      .toUpperCase()
+      .replace(/&/g, " AND ")
+      .replace(/[^A-Z0-9]/g, "");
+  }
+
+  function levenshtein(a, b) {
+    a = a || ""; b = b || "";
+    const n = a.length, m = b.length;
+    if (n === 0) return m;
+    if (m === 0) return n;
+
+    const dp = new Array(m + 1);
+    for (let j = 0; j <= m; j++) dp[j] = j;
+
+    for (let i = 1; i <= n; i++) {
+      let prev = dp[0];
+      dp[0] = i;
+      const ai = a.charCodeAt(i - 1);
+      for (let j = 1; j <= m; j++) {
+        const temp = dp[j];
+        const cost = (ai === b.charCodeAt(j - 1)) ? 0 : 1;
+        dp[j] = Math.min(dp[j] + 1, dp[j - 1] + 1, prev + cost);
+        prev = temp;
+      }
+    }
+    return dp[m];
+  }
+
+  function scoreMatch(qRaw, candidate) {
+    const q = (qRaw || "").toString().trim();
+    if (!q) return 0;
+
+    const qK = normKey(q);
+    const cK = normKey(candidate);
+    if (!qK || !cK) return 0;
+
+    let score = 0;
+    if (cK === qK) score += 100000;
+    if (cK.startsWith(qK)) score += 50000;
+    if (cK.includes(qK)) score += 20000;
+
+    const qTokens = q.toUpperCase().split(/[\s\-\/:|]+/).filter(Boolean);
+    const cUpper = (candidate || "").toString().toUpperCase();
+
+    let tokenHits = 0;
+    for (const t of qTokens) {
+      if (t.length < 2) continue;
+      if (cUpper.includes(t)) tokenHits += 1;
+    }
+    score += tokenHits * 1500;
+
+    const dist = levenshtein(qK, cK);
+    score += Math.max(0, 1200 - dist * 40);
+    score += Math.max(0, 200 - Math.abs(cK.length - qK.length) * 3);
+
+    return score;
+  }
+
+  async function fetchMatches(qRaw) {
+    const q = (qRaw || "").toString().trim();
+
+    if (!q) {
+      const now = Date.now();
+      if (cachedTopPayload && (now - cachedTopAt) < 5 * 60 * 1000) {
+        return cachedTopPayload;
+      }
+    }
+
+    const resp = await fetch(`/project_types?q=${encodeURIComponent(q)}`);
+    const payload = await resp.json();
+
+    if (!q) {
+      cachedTopPayload = payload;
+      cachedTopAt = Date.now();
+    }
+    return payload;
+  }
+
+  function setKnownStatus() {
+    pStatus.innerHTML = `Known project type in database <span class="pill ok">Known</span>`;
+  }
+
+  function setNotKnownStatus() {
+    pStatus.innerHTML = `No exact match in database — you can still proceed <span class="pill bad">Not in database</span>`;
+  }
+
+  function setTopStatus() {
+    pStatus.textContent = "Suggestions (start typing to narrow down).";
+  }
+
+  function renderMatches(payload, qRawForRanking) {
+    const qRaw = (qRawForRanking || "").toString();
+    let matches = payload.matches || [];
+    const exact = !!payload.exact;
+
+    acList.innerHTML = "";
+
+    if (!qRaw.trim()) {
+      setTopStatus();
+    } else if (exact) {
+      setKnownStatus();
+    } else {
+      setNotKnownStatus();
+    }
+
+    if (qRaw.trim()) {
+      matches = matches
+        .map((m) => ({ m, s: scoreMatch(qRaw, m) }))
+        .sort((a, b) => b.s - a.s)
+        .map((x) => x.m);
+    }
+
+    if (matches.length === 0) {
+      const div = document.createElement("div");
+      div.className = "ac-item";
+      div.innerHTML = `<b>No matches</b><div class="hint">Try a shorter prefix.</div>`;
+      acList.appendChild(div);
+      openAC();
+      return;
+    }
+
+    matches.forEach((m) => {
+      const div = document.createElement("div");
+      div.className = "ac-item";
+      div.innerHTML = `<b class="mono">${escapeHtml(m)}</b>`;
+      div.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        pInput.value = m;
+        setKnownStatus();
+        closeAC();
+      });
+      acList.appendChild(div);
+    });
+
+    openAC();
+  }
+
+  async function showTopSuggestions() {
+    try {
+      const payload = await fetchMatches("");
+      renderMatches(payload, "");
+    } catch (e) {}
+  }
+
+  if (pInput) {
+    pInput.addEventListener("focus", () => {
+      showTopSuggestions();
+    });
+
+    pInput.addEventListener("click", () => {
+      if (!acOpen) showTopSuggestions();
+    });
+
+    pInput.addEventListener("input", () => {
+      const qRaw = (pInput.value || "").toString();
+
+      if (acTimer) clearTimeout(acTimer);
+
+      if (!qRaw.trim()) {
+        acTimer = setTimeout(() => {
+          showTopSuggestions();
+        }, 60);
+        return;
+      }
+
+      acTimer = setTimeout(async () => {
+        try {
+          lastQuerySent = qRaw;
+          const payload = await fetchMatches(qRaw);
+          if ((pInput.value || "") !== lastQuerySent) return;
+          renderMatches(payload, qRaw);
+        } catch (e) {}
+      }, 120);
+    });
+
+    pInput.addEventListener("blur", () => {
+      setTimeout(async () => {
+        if (!pInput) return;
+
+        const q = (pInput.value || "").toString().trim();
+        if (!q.length) {
+          closeAC();
+          return;
+        }
+
+        try {
+          const payload = await fetchMatches(q);
+          if (payload && payload.exact) setKnownStatus();
+          else setNotKnownStatus();
+        } catch (e) {}
+        closeAC();
+      }, 160);
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!acOpen) return;
+      const wrap = pInput.closest(".ac-wrap");
+      if (wrap && wrap.contains(e.target)) return;
+      closeAC();
+    });
+  }
+</script>
+
+</body>
+</html>
